@@ -1,0 +1,1 @@
+{ "crons": [{ "path": "/api/renungan/generate", "schedule": "0 21 * * *" }] }
