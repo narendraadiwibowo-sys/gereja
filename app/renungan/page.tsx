@@ -1,4 +1,3 @@
-import { getSupabase } from "@/lib/db";
 import { tgl } from "@/lib/format";
 import Link from "next/link";
 
@@ -6,11 +5,30 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const metadata = { title: "Renungan Harian" };
 
+const SUPABASE_URL = "https://krhykwqwxucdhpuskxjw.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtyaHlrd3F3eHVjZGhwdXNreGp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0ODc3MjUsImV4cCI6MjEwOTA2MzcyNX0.h1WjCb7GuI03W_mC4VDgNvHHFhDF6-qZ3HUaq4tFO_U";
+
+async function getLatestRenungan() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/renungan?select=*&order=tanggal.desc&limit=1`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      cache: "no-store",
+    });
+
+    if (!res.ok) return null;
+    const items = await res.json();
+    return items && items.length > 0 ? items[0] : null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function Renungan() {
-  const supabase = getSupabase();
-  const data = supabase
-    ? (await supabase.from("renungan").select("*").order("tanggal", { ascending: false }).limit(1).maybeSingle()).data
-    : null;
+  const data = await getLatestRenungan();
 
   return (
     <div className="wrap">
