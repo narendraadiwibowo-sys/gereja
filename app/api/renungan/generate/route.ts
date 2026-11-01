@@ -5,9 +5,11 @@ export const maxDuration = 60;
 
 // Dipanggil Vercel Cron tiap hari 04.00 WIB. Vercel otomatis kirim "Authorization: Bearer $CRON_SECRET".
 export async function GET(req: Request) {
-  if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+  const authHeader = req.headers.get("authorization");
+  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response("Unauthorized", { status: 401 });
   }
+
   const tanggal = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
   const ayat = daftarAyat[Math.floor(Math.random() * daftarAyat.length)];
 
@@ -16,13 +18,13 @@ export async function GET(req: Request) {
     return new Response("GEMINI_API_KEY is not configured", { status: 500 });
   }
 
-  const prompt = `Tulis renungan harian Kristen untuk jemaat GKJ (Gereja Kristen Jawa) dari ${ayat}. Gunakan bahasa Indonesia yang hangat dan sederhana. Tulis TEPAT 3 paragraf, dipisah satu baris kosong, tanpa judul, dan tanpa markdown formatting (jangan gunakan tanda bintang atau simbol cetak tebal). Jangan mengutip bunyi ayat kata per kata; rujuk isinya dengan kata-katamu sendiri. 
-Paragraf 1: konteks ayat. 
-Paragraf 2: makna bagi hidup beriman. 
-Paragraf 3: penerapan praktis hari ini serta ditutup doa singkat.`;
+  const prompt = `Tulis renungan harian Kristen untuk jemaat GKJ (Gereja Kristen Jawa) dari ${ayat}. Gunakan bahasa Indonesia yang hangat, bersahaja, dan menguatkan. Tulis TEPAT 3 paragraf, dipisah satu baris kosong, tanpa judul, dan jangan gunakan format markdown tebal atau bintang (*). Jangan mengutip bunyi ayat kata per kata. 
+Paragraf 1: pengantar konteks ayat secara reflektif. 
+Paragraf 2: makna teologis bagi perjalanan hidup beriman sehari-hari. 
+Paragraf 3: penerapan praktis hari ini serta ditutup dengan doa singkat satu kalimat.`;
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiApiKey}`,
     {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -37,7 +39,8 @@ Paragraf 3: penerapan praktis hari ini serta ditutup doa singkat.`;
   );
 
   if (!res.ok) {
-    return new Response(await res.text(), { status: 502 });
+    const errText = await res.text();
+    return new Response(errText, { status: 502 });
   }
 
   const data = await res.json();
@@ -50,5 +53,5 @@ Paragraf 3: penerapan praktis hari ini serta ditutup doa singkat.`;
   const { error } = await db().from("renungan").upsert({ tanggal, ayat, isi });
   if (error) return new Response(error.message, { status: 500 });
 
-  return Response.json({ ok: true, tanggal, ayat });
+  return Response.json({ ok: true, tanggal, ayat, isi });
 }

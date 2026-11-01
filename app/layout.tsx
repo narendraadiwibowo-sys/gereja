@@ -22,8 +22,8 @@ const menu = [
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" className={`${head.variable} ${body.variable}`}>
-      <body>
+    <html lang="id" className={`${head.variable} ${body.variable}`} suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <header className="top">
           <div className="wrap">
             <Link href="/" className="logo-text">
