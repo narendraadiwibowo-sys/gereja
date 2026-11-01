@@ -3,6 +3,14 @@ import { daftarAyat } from "@/lib/site";
 
 export const maxDuration = 60;
 
+// Daftar model dengan urutan fallback otomatis
+const MODELS = [
+  "gemini-3.5-flash",
+  "gemini-3.6-flash",
+  "gemini-3.7-flash",
+  "gemini-3.8-flash",
+];
+
 // Dipanggil Vercel Cron tiap hari 04.00 WIB. Vercel otomatis kirim "Authorization: Bearer $CRON_SECRET".
 export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization");
@@ -23,31 +31,44 @@ Paragraf 1: pengantar konteks ayat secara reflektif.
 Paragraf 2: makna teologis bagi perjalanan hidup beriman sehari-hari. 
 Paragraf 3: penerapan praktis hari ini serta ditutup dengan doa singkat satu kalimat.`;
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${geminiApiKey}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 900,
-        },
-      }),
-    }
-  );
+  let isi = "";
+  let lastError = "";
 
-  if (!res.ok) {
-    const errText = await res.text();
-    return new Response(errText, { status: 502 });
+  // Coba model secara berurutan jika ada model yang sedang sibuk (503/high demand)
+  for (const model of MODELS) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 900,
+            },
+          }),
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (text) {
+          isi = text;
+          break;
+        }
+      } else {
+        lastError = await res.text();
+      }
+    } catch (err: any) {
+      lastError = err?.message || "Network error";
+    }
   }
 
-  const data = await res.json();
-  const isi = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-
   if (!isi) {
-    return new Response("Gagal menghasilkan konten renungan", { status: 500 });
+    return new Response(`Gagal menghasilkan renungan dari Gemini: ${lastError}`, { status: 502 });
   }
 
   const { error } = await db().from("renungan").upsert({ tanggal, ayat, isi });
